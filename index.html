@@ -3,87 +3,347 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Queue Dialer with Manual Entry</title>
+    <title>Streamline Dialer</title>
     <!-- SheetJS Library for reading Excel/CSV files -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; padding: 20px; background: #f8f9fa; color: #333; max-width: 600px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .contact-row, .queue-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .completed { color: #28a745; text-decoration: line-through; }
-        .btn { display: block; background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; text-decoration: none; text-align: center; margin: 10px 0; width: 100%; box-sizing: border-box;}
-        .btn-success { background: #28a745; }
-        .btn-warning { background: #ffc107; color: #333; }
-        .btn-secondary { background: #6c757d; }
-        .button-group { display: flex; gap: 10px; }
+        :root {
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --card-border: #d2d2d7;
+            --text-main: #1d1d1f;
+            --text-muted: #86868b;
+            --apple-blue: #0071e3;
+            --apple-blue-hover: #0077ed;
+            --input-bg: #fbfbfd;
+            --success-color: #34c759;
+            --warning-color: #ff9500;
+            --danger-color: #ff3b30;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #000000;
+            --card-bg: #161617;
+            --card-border: #38383a;
+            --text-main: #f5f5f7;
+            --text-muted: #86868b;
+            --apple-blue: #2997ff;
+            --apple-blue-hover: #0077ed;
+            --input-bg: #1d1d1f;
+            --success-color: #30d158;
+            --warning-color: #ff9f0a;
+            --danger-color: #ff453a;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
+            padding: 24px 16px; 
+            background: var(--bg-color); 
+            color: var(--text-main); 
+            max-width: 480px; 
+            margin: auto; 
+            -webkit-font-smoothing: antialiased;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        h2 {
+            margin: 0;
+            color: var(--text-main);
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            font-size: 1.4rem;
+        }
+
+        .theme-toggle-btn {
+            background: var(--card-border);
+            border: none;
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 980px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .theme-toggle-btn:hover {
+            opacity: 0.8;
+        }
+
+        h3 {
+            font-size: 0.95rem;
+            margin-top: 0;
+            color: var(--text-main);
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            margin-bottom: 12px;
+        }
+
+        .card { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 18px; 
+            border: 1px solid var(--card-border);
+            margin-bottom: 16px; 
+            box-shadow: var(--shadow);
+            transition: background 0.3s ease, border 0.3s ease;
+        }
+
+        .contact-row, .queue-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px 8px; 
+            border-bottom: 1px solid var(--card-border); 
+            font-size: 13.5px; 
+            color: var(--text-main);
+        }
+
+        .contact-row:last-child, .queue-item:last-child {
+            border-bottom: none;
+        }
+
+        .completed { 
+            color: var(--success-color); 
+            text-decoration: line-through; 
+            opacity: 0.8;
+        }
+
+        .btn { 
+            display: block; 
+            background: var(--apple-blue); 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 980px; 
+            font-size: 14px; 
+            font-weight: 400;
+            cursor: pointer; 
+            text-decoration: none; 
+            text-align: center; 
+            margin: 10px 0; 
+            width: 100%; 
+            box-sizing: border-box;
+            letter-spacing: -0.01em;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+
+        .btn:hover {
+            background: var(--apple-blue-hover);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-success { 
+            background: var(--success-color); 
+            color: #ffffff;
+        }
+
+        .btn-warning { 
+            background: var(--warning-color); 
+            color: #ffffff; 
+        }
+
+        .btn-danger { 
+            background: var(--danger-color); 
+            color: #ffffff; 
+        }
+        .btn-danger:hover { opacity: 0.9; }
+
+        .btn-secondary { 
+            background: transparent; 
+            color: var(--apple-blue); 
+            border: 1px solid var(--card-border);
+        }
+        .btn-secondary:hover { 
+            background: var(--card-border);
+        }
+
+        .button-group { 
+            display: flex; 
+            gap: 10px; 
+        }
+
         input[type="file"] { display: none; }
-        .file-upload-label { background: #6c757d; color: white; padding: 12px 20px; border-radius: 8px; display: block; text-align: center; cursor: pointer; font-size: 16px; margin-top: 10px; }
-        input[type="text"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; margin-bottom: 10px; }
-        .scroll-box { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-top: 10px; }
-        .manual-section { border-top: 1px dashed #ccc; padding-top: 15px; margin-top: 15px; }
+
+        .file-upload-label { 
+            background: transparent; 
+            color: var(--apple-blue); 
+            border: 1px solid var(--card-border);
+            padding: 12px 20px; 
+            border-radius: 980px; 
+            display: block; 
+            text-align: center; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 400;
+            margin-top: 10px; 
+            transition: background 0.2s;
+        }
+        .file-upload-label:hover {
+            background: var(--card-border);
+        }
+
+        input[type="text"], input[type="tel"] { 
+            width: 100%; 
+            padding: 10px 14px; 
+            box-sizing: border-box; 
+            border: 1px solid var(--card-border); 
+            border-radius: 10px; 
+            font-size: 14px; 
+            margin-bottom: 10px; 
+            background: var(--input-bg);
+            color: var(--text-main);
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus, input[type="tel"]:focus {
+            outline: none;
+            border-color: var(--apple-blue);
+        }
+
+        .scroll-box { 
+            max-height: 180px; 
+            overflow-y: auto; 
+            border: 1px solid var(--card-border); 
+            border-radius: 10px; 
+            margin-top: 10px; 
+            background: var(--input-bg);
+        }
+
+        .manual-section { 
+            border-top: 1px solid var(--card-border); 
+            padding-top: 16px; 
+            margin-top: 16px; 
+        }
+
+        .target-box {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
     </style>
 </head>
 <body>
 
-    <h2>Call Queue Manager</h2>
+    <div class="header-container">
+        <h2>Queue Dialer</h2>
+        <button class="theme-toggle-btn" onclick="toggleTheme()">Appearance</button>
+    </div>
 
     <!-- Step 1: Load Contacts via File Upload -->
     <div class="card" id="upload-card">
-        <h3>1. Load Your Contacts</h3>
-        <p style="font-size: 13px; color: #666;">Export your phone contacts to an Excel/CSV file (Column A: Name, Column B: Phone) and upload it here once.</p>
+        <h3>Source Data</h3>
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px;">Upload an Excel or CSV spreadsheet (Column A: Name, Column B: Phone).</p>
         <label class="file-upload-label">
-            📁 Upload Contacts File (Excel/CSV)
+            Choose File
             <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" onchange="handleFileUpload(event)">
         </label>
         
-        <!-- Option to skip straight to manual/queue if they don't have a bulk file -->
-        <button class="btn btn-secondary" style="margin-top: 10px;" onclick="skipToQueue()">Skip File / Start Clean Queue</button>
+        <button class="btn btn-secondary" style="margin-top: 10px;" onclick="skipToQueue()">Manual Mode</button>
     </div>
 
     <!-- Step 2: Custom Search & Selection Box -->
     <div class="card" id="search-card" style="display:none;">
-        <h3>2. Search & Select Contacts</h3>
-        <input type="text" id="search-box" placeholder="Type to search (e.g., IIT, John)..." oninput="filterMasterList()">
+        <h3>Select Recipients</h3>
+        <input type="text" id="search-box" placeholder="Search records..." oninput="filterMasterList()">
         
         <div class="scroll-box" id="master-contact-list">
             <!-- Dynamically populated searchable list -->
         </div>
 
-        <button class="btn btn-success" style="margin-top: 15px;" onclick="generateQueue()">Create Call Queue from Selected</button>
+        <button class="btn" style="margin-top: 14px;" onclick="generateQueue()">Create Queue</button>
     </div>
 
     <!-- Step 3: Active Calling Control Panel -->
     <div class="card" id="active-panel" style="display:none;">
-        <h3>Current Target</h3>
-        <p id="target-info" style="font-size: 18px; font-weight: bold;"></p>
-        
-        <a id="dial-link" href="#" class="btn">📞 Dial Number</a>
-
-        <p style="font-size: 13px; color: #666; margin-top: 15px;">Finished call? Choose an option:</p>
-        <div class="button-group">
-            <button class="btn btn-warning" onclick="redialCurrent()">🔄 Redial</button>
-            <button class="btn btn-success" onclick="nextContact()">✅ Next Person</button>
+        <h3>Current Call</h3>
+        <div class="target-box">
+            <p id="target-info" style="font-size: 15px; font-weight: 500; color: var(--text-main); margin: 0;"></p>
         </div>
+        
+        <a id="dial-link" href="#" class="btn">Dial Number</a>
+
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 12px; text-align: center;">Actions:</p>
+        <div class="button-group">
+            <button class="btn btn-warning" onclick="redialCurrent()">Redial</button>
+            <button class="btn btn-success" onclick="nextContact()">Next</button>
+        </div>
+        
+        <button class="btn btn-danger" style="margin-top: 12px;" onclick="promptBreakOrEnd()">⏹️ Stop & Session Report</button>
     </div>
 
     <!-- Step 4: Active Queue View & Manual Add -->
     <div class="card" id="queue-card" style="display:none;">
-        <h3>Active Queue List (<span id="queue-count">0</span>)</h3>
-        <div id="queue-list"></div>
+        <h3>Queue Status (<span id="queue-count">0</span>)</h3>
+        <div id="queue-list" class="scroll-box" style="max-height: 150px; border: none; background: transparent;"></div>
 
         <!-- Manual Add on the Fly -->
         <div class="manual-section">
-            <h4>➕ Add Number on the Fly</h4>
-            <input type="text" id="manual-name" placeholder="Name (e.g., Random Person)">
-            <input type="text" id="manual-phone" placeholder="Phone Number (e.g., 7867214746)">
+            <h4 style="margin-top:0; font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Add Number</h4>
+            <input type="text" id="manual-name" placeholder="Name">
+            <input type="tel" id="manual-phone" placeholder="Phone Number" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
             <button class="btn btn-secondary" onclick="addManualNumber()">Add to Queue</button>
         </div>
+    </div>
+
+    <!-- Step 5: Report Card (Hidden until generated) -->
+    <div class="card" id="report-card" style="display:none;">
+        <h3>📊 Session Report</h3>
+        <div id="report-content" style="font-size: 13.5px; line-height: 1.5; margin-bottom: 15px;"></div>
+        
+        <div class="button-group">
+            <button class="btn btn-secondary" onclick="copyReport()">📋 Copy</button>
+            <button class="btn btn-success" onclick="sendWhatsApp()">💬 WhatsApp</button>
+        </div>
+        <button class="btn btn-secondary" style="margin-top: 8px;" onclick="resetApp()">Start New Session</button>
     </div>
 
     <script>
         let masterContacts = []; 
         let callQueue = [];
         let currentIndex = 0;
+
+        function initTheme() {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        }
+        initTheme();
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        });
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.getAttribute('data-theme') === 'dark') {
+                html.removeAttribute('data-theme');
+            } else {
+                html.setAttribute('data-theme', 'dark');
+            }
+        }
 
         function handleFileUpload(event) {
             const file = event.target.files[0];
@@ -142,8 +402,8 @@
                 div.className = 'contact-row';
                 div.innerHTML = `
                     <label style="display:flex; align-items:center; gap: 10px; width: 100%; cursor: pointer;">
-                        <input type="checkbox" value="${c.id}" class="contact-checkbox">
-                        <span><strong>${c.name}</strong> — ${c.phone}</span>
+                        <input type="checkbox" value="${c.id}" class="contact-checkbox" style="width: 16px; height: 16px; accent-color: var(--apple-blue);">
+                        <span><strong>${c.name}</strong> <span style="color: var(--text-muted); font-size: 12.5px;">(${c.phone})</span></span>
                     </label>
                 `;
                 container.appendChild(div);
@@ -180,13 +440,12 @@
             updateUI();
         }
 
-        // Allow users to add an arbitrary phone number not found in their lists
         function addManualNumber() {
             let nameInput = document.getElementById('manual-name').value.trim();
             let phoneInput = document.getElementById('manual-phone').value.trim();
 
-            if (!phoneInput) {
-                alert("Please enter at least a phone number.");
+            if (phoneInput.length !== 10) {
+                alert("Phone number must be exactly 10 digits.");
                 return;
             }
 
@@ -196,7 +455,6 @@
                 status: "pending"
             });
 
-            // Clear inputs
             document.getElementById('manual-name').value = '';
             document.getElementById('manual-phone').value = '';
 
@@ -215,7 +473,7 @@
 
                 let div = document.createElement('div');
                 div.className = `queue-item ${item.status === 'completed' ? 'completed' : ''}`;
-                div.innerHTML = `<span>${index + 1}. ${item.name}</span> <span>${item.phone}</span>`;
+                div.innerHTML = `<span>${index + 1}. <strong>${item.name}</strong></span> <span>${item.phone}</span>`;
                 listEl.appendChild(div);
 
                 if (item.status === 'pending' && !activeSet) {
@@ -229,10 +487,10 @@
             document.getElementById('queue-count').innerText = pendingCount;
 
             if (!activeSet && callQueue.length > 0) {
-                document.getElementById('target-info').innerText = "🎉 All calls in the queue are completed!";
+                document.getElementById('target-info').innerText = "All calls completed";
                 document.getElementById('dial-link').style.display = 'none';
             } else if (callQueue.length === 0) {
-                document.getElementById('target-info').innerText = "Queue is empty. Add numbers below or upload a sheet.";
+                document.getElementById('target-info').innerText = "Queue is empty. Add targets below.";
                 document.getElementById('dial-link').style.display = 'none';
             } else {
                 document.getElementById('dial-link').style.display = 'block';
@@ -251,6 +509,71 @@
                 callQueue[currentIndex].status = 'completed';
                 updateUI();
             }
+        }
+
+        function promptBreakOrEnd() {
+            let choice = prompt("Choose an option:\n1 = Take a Break (Pause session)\n2 = End List & View Report", "1");
+            
+            if (choice === "1") {
+                alert("Session paused. Resume whenever ready!");
+            } else if (choice === "2") {
+                showReport();
+            }
+        }
+
+        function showReport() {
+            document.getElementById('active-panel').style.display = 'none';
+            document.getElementById('queue-card').style.display = 'none';
+            
+            let completedList = callQueue.filter(c => c.status === 'completed');
+            let pendingList = callQueue.filter(c => c.status === 'pending');
+
+            let reportHTML = `<strong>✅ Picked Up / Completed (${completedList.length}):</strong><br>`;
+            if (completedList.length > 0) {
+                completedList.forEach(c => { reportHTML += `- ${c.name} (${c.phone})<br>`; });
+            } else {
+                reportHTML += `None<br>`;
+            }
+
+            reportHTML += `<br><strong>⏳ Pending / Remaining (${pendingList.length}):</strong><br>`;
+            if (pendingList.length > 0) {
+                pendingList.forEach(c => { reportHTML += `- ${c.name} (${c.phone})<br>`; });
+            } else {
+                reportHTML += `None<br>`;
+            }
+
+            document.getElementById('report-content').innerHTML = reportHTML;
+            document.getElementById('report-card').style.display = 'block';
+        }
+
+        function generateReportText() {
+            let completedList = callQueue.filter(c => c.status === 'completed');
+            let pendingList = callQueue.filter(c => c.status === 'pending');
+
+            let text = `📊 *Call Session Report*\n\n`;
+            text += `*Completed (${completedList.length}):*\n`;
+            completedList.forEach(c => { text += `• ${c.name} (${c.phone})\n`; });
+
+            text += `\n*Pending (${pendingList.length}):*\n`;
+            pendingList.forEach(c => { text += `• ${c.name} (${c.phone})\n`; });
+
+            return text;
+        }
+
+        function copyReport() {
+            let reportText = generateReportText();
+            navigator.clipboard.writeText(reportText).then(() => {
+                alert("Report copied to clipboard!");
+            });
+        }
+
+        function sendWhatsApp() {
+            let reportText = encodeURIComponent(generateReportText());
+            window.open(`https://wa.me/?text=${reportText}`, '_blank');
+        }
+
+        function resetApp() {
+            location.reload();
         }
     </script>
 </body>
