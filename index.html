@@ -3,35 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Queue Dialer with Excel Support</title>
-    <!-- SheetJS Library for reading Excel files in the browser -->
+    <title>Smart Queue Dialer with Manual Entry</title>
+    <!-- SheetJS Library for reading Excel/CSV files -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; padding: 20px; background: #f8f9fa; color: #333; max-width: 600px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .queue-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .contact-row, .queue-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
         .completed { color: #28a745; text-decoration: line-through; }
         .btn { display: block; background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; text-decoration: none; text-align: center; margin: 10px 0; width: 100%; box-sizing: border-box;}
         .btn-success { background: #28a745; }
         .btn-warning { background: #ffc107; color: #333; }
+        .btn-secondary { background: #6c757d; }
         .button-group { display: flex; gap: 10px; }
         input[type="file"] { display: none; }
         .file-upload-label { background: #6c757d; color: white; padding: 12px 20px; border-radius: 8px; display: block; text-align: center; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        input[type="text"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; margin-bottom: 10px; }
+        .scroll-box { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-top: 10px; }
+        .manual-section { border-top: 1px dashed #ccc; padding-top: 15px; margin-top: 15px; }
     </style>
 </head>
 <body>
 
     <h2>Call Queue Manager</h2>
 
-    <div class="card">
-        <button class="btn" onclick="importContacts()">📱 Select from Phone Contacts</button>
-        
+    <!-- Step 1: Load Contacts via File Upload -->
+    <div class="card" id="upload-card">
+        <h3>1. Load Your Contacts</h3>
+        <p style="font-size: 13px; color: #666;">Export your phone contacts to an Excel/CSV file (Column A: Name, Column B: Phone) and upload it here once.</p>
         <label class="file-upload-label">
-            📁 Upload Excel/CSV Sheet
-            <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
+            📁 Upload Contacts File (Excel/CSV)
+            <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" onchange="handleFileUpload(event)">
         </label>
+        
+        <!-- Option to skip straight to manual/queue if they don't have a bulk file -->
+        <button class="btn btn-secondary" style="margin-top: 10px;" onclick="skipToQueue()">Skip File / Start Clean Queue</button>
     </div>
 
+    <!-- Step 2: Custom Search & Selection Box -->
+    <div class="card" id="search-card" style="display:none;">
+        <h3>2. Search & Select Contacts</h3>
+        <input type="text" id="search-box" placeholder="Type to search (e.g., IIT, John)..." oninput="filterMasterList()">
+        
+        <div class="scroll-box" id="master-contact-list">
+            <!-- Dynamically populated searchable list -->
+        </div>
+
+        <button class="btn btn-success" style="margin-top: 15px;" onclick="generateQueue()">Create Call Queue from Selected</button>
+    </div>
+
+    <!-- Step 3: Active Calling Control Panel -->
     <div class="card" id="active-panel" style="display:none;">
         <h3>Current Target</h3>
         <p id="target-info" style="font-size: 18px; font-weight: bold;"></p>
@@ -45,40 +66,26 @@
         </div>
     </div>
 
-    <div class="card">
-        <h3>Queue List (<span id="queue-count">0</span>)</h3>
+    <!-- Step 4: Active Queue View & Manual Add -->
+    <div class="card" id="queue-card" style="display:none;">
+        <h3>Active Queue List (<span id="queue-count">0</span>)</h3>
         <div id="queue-list"></div>
+
+        <!-- Manual Add on the Fly -->
+        <div class="manual-section">
+            <h4>➕ Add Number on the Fly</h4>
+            <input type="text" id="manual-name" placeholder="Name (e.g., Random Person)">
+            <input type="text" id="manual-phone" placeholder="Phone Number (e.g., 7867214746)">
+            <button class="btn btn-secondary" onclick="addManualNumber()">Add to Queue</button>
+        </div>
     </div>
 
     <script>
+        let masterContacts = []; 
         let callQueue = [];
         let currentIndex = 0;
 
-        // 1. Native Phone Contact Picker
-        async function importContacts() {
-            const supported = "contacts" in navigator && "ContactsManager" in window;
-            if (!supported) {
-                alert("Contact Picker API is not supported on this browser. Use Chrome on Android or upload an Excel sheet.");
-                return;
-            }
-
-            try {
-                const contacts = await navigator.contacts.select(["name", "tel"], { multiple: true });
-                if (contacts.length > 0) {
-                    callQueue = contacts.map(c => ({
-                        name: c.name ? c.name[0] : "Unknown",
-                        phone: c.tel ? c.tel[0] : "",
-                        status: "pending"
-                    }));
-                    initQueue();
-                }
-            } catch (ex) {
-                console.log("Selection cancelled", ex);
-            }
-        }
-
-        // 2. Excel / CSV File Parser
-        function handleExcelUpload(event) {
+        function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -87,46 +94,112 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    // Grab the first sheet
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    // Convert sheet to JSON array of rows
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                     const jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     
-                    let newQueue = [];
-                    // Loop through rows (assumes Column A = Name, Column B = Phone)
-                    jsonRows.forEach(row => {
+                    masterContacts = [];
+                    jsonRows.forEach((row, idx) => {
                         if (row && row.length >= 2) {
                             let nameVal = String(row[0] || "").trim();
                             let phoneVal = String(row[1] || "").trim();
-                            if (phoneVal) { // Ensure there is at least a phone number
-                                newQueue.push({
-                                    name: nameVal || "Client",
-                                    phone: phoneVal,
-                                    status: "pending"
+                            if (phoneVal) {
+                                masterContacts.push({
+                                    id: idx,
+                                    name: nameVal || "Unknown",
+                                    phone: phoneVal
                                 });
                             }
                         }
                     });
 
-                    if (newQueue.length > 0) {
-                        callQueue = newQueue;
-                        initQueue();
+                    if (masterContacts.length > 0) {
+                        document.getElementById('upload-card').style.display = 'none';
+                        document.getElementById('search-card').style.display = 'block';
+                        renderMasterList(masterContacts);
                     } else {
-                        alert("Could not find valid data. Ensure Column A is Name and Column B is Phone.");
+                        alert("No valid phone numbers found. Ensure Column A is Name and Column B is Phone.");
                     }
                 } catch (err) {
-                    alert("Error reading Excel file: " + err.message);
+                    alert("Error reading file: " + err.message);
                 }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function initQueue() {
-            currentIndex = 0;
+        function skipToQueue() {
+            document.getElementById('upload-card').style.display = 'none';
             document.getElementById('active-panel').style.display = 'block';
+            document.getElementById('queue-card').style.display = 'block';
+            updateUI();
+        }
+
+        function renderMasterList(contacts) {
+            const container = document.getElementById('master-contact-list');
+            container.innerHTML = '';
+            
+            contacts.forEach(c => {
+                let div = document.createElement('div');
+                div.className = 'contact-row';
+                div.innerHTML = `
+                    <label style="display:flex; align-items:center; gap: 10px; width: 100%; cursor: pointer;">
+                        <input type="checkbox" value="${c.id}" class="contact-checkbox">
+                        <span><strong>${c.name}</strong> — ${c.phone}</span>
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function filterMasterList() {
+            let query = document.getElementById('search-box').value.toLowerCase();
+            let filtered = masterContacts.filter(c => 
+                c.name.toLowerCase().includes(query) || c.phone.includes(query)
+            );
+            renderMasterList(filtered);
+        }
+
+        function generateQueue() {
+            const checkboxes = document.querySelectorAll('.contact-checkbox:checked');
+            
+            callQueue = [];
+            checkboxes.forEach(cb => {
+                let contactId = parseInt(cb.value);
+                let originalContact = masterContacts.find(c => c.id === contactId);
+                if (originalContact) {
+                    callQueue.push({
+                        name: originalContact.name,
+                        phone: originalContact.phone,
+                        status: "pending"
+                    });
+                }
+            });
+
+            document.getElementById('search-card').style.display = 'none';
+            document.getElementById('active-panel').style.display = 'block';
+            document.getElementById('queue-card').style.display = 'block';
+            updateUI();
+        }
+
+        // Allow users to add an arbitrary phone number not found in their lists
+        function addManualNumber() {
+            let nameInput = document.getElementById('manual-name').value.trim();
+            let phoneInput = document.getElementById('manual-phone').value.trim();
+
+            if (!phoneInput) {
+                alert("Please enter at least a phone number.");
+                return;
+            }
+
+            callQueue.push({
+                name: nameInput || "Manual Entry",
+                phone: phoneInput,
+                status: "pending"
+            });
+
+            // Clear inputs
+            document.getElementById('manual-name').value = '';
+            document.getElementById('manual-phone').value = '';
+
             updateUI();
         }
 
@@ -158,6 +231,11 @@
             if (!activeSet && callQueue.length > 0) {
                 document.getElementById('target-info').innerText = "🎉 All calls in the queue are completed!";
                 document.getElementById('dial-link').style.display = 'none';
+            } else if (callQueue.length === 0) {
+                document.getElementById('target-info').innerText = "Queue is empty. Add numbers below or upload a sheet.";
+                document.getElementById('dial-link').style.display = 'none';
+            } else {
+                document.getElementById('dial-link').style.display = 'block';
             }
         }
 
