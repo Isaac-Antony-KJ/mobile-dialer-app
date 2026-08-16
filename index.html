@@ -3,16 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Queue Dialer</title>
+    <title>Smart Queue Dialer with Excel Support</title>
+    <!-- SheetJS Library for reading Excel files in the browser -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; padding: 20px; background: #f8f9fa; color: #333; max-width: 600px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .queue-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
         .completed { color: #28a745; text-decoration: line-through; }
-        .btn { display: inline-block; background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; text-decoration: none; text-align: center; margin: 5px 0; width: 100%; box-sizing: border-box;}
+        .btn { display: block; background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; text-decoration: none; text-align: center; margin: 10px 0; width: 100%; box-sizing: border-box;}
         .btn-success { background: #28a745; }
         .btn-warning { background: #ffc107; color: #333; }
         .button-group { display: flex; gap: 10px; }
+        input[type="file"] { display: none; }
+        .file-upload-label { background: #6c757d; color: white; padding: 12px 20px; border-radius: 8px; display: block; text-align: center; cursor: pointer; font-size: 16px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -20,17 +24,21 @@
     <h2>Call Queue Manager</h2>
 
     <div class="card">
-        <button class="btn" onclick="importContacts()">1. Select Contacts from Phone</button>
+        <button class="btn" onclick="importContacts()">📱 Select from Phone Contacts</button>
+        
+        <label class="file-upload-label">
+            📁 Upload Excel/CSV Sheet
+            <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
+        </label>
     </div>
 
     <div class="card" id="active-panel" style="display:none;">
         <h3>Current Target</h3>
         <p id="target-info" style="font-size: 18px; font-weight: bold;"></p>
         
-        <!-- Opens Native Dialer -->
-        <a id="dial-link" href="#" class="btn">Dial Number</a>
+        <a id="dial-link" href="#" class="btn">📞 Dial Number</a>
 
-        <p style="font-size: 13px; color: #666; margin-top: 15px;">Finished the call? Choose an option below:</p>
+        <p style="font-size: 13px; color: #666; margin-top: 15px;">Finished call? Choose an option:</p>
         <div class="button-group">
             <button class="btn btn-warning" onclick="redialCurrent()">🔄 Redial</button>
             <button class="btn btn-success" onclick="nextContact()">✅ Next Person</button>
@@ -46,33 +54,80 @@
         let callQueue = [];
         let currentIndex = 0;
 
-        // Uses Android's native Contact Picker API
+        // 1. Native Phone Contact Picker
         async function importContacts() {
             const supported = "contacts" in navigator && "ContactsManager" in window;
             if (!supported) {
-                alert("Contact Picker API is not supported on this browser. Try Chrome on Android.");
+                alert("Contact Picker API is not supported on this browser. Use Chrome on Android or upload an Excel sheet.");
                 return;
             }
 
             try {
-                const props = ["name", "tel"];
-                const opts = { multiple: true };
-                const contacts = await navigator.contacts.select(props, opts);
-                
+                const contacts = await navigator.contacts.select(["name", "tel"], { multiple: true });
                 if (contacts.length > 0) {
-                    // Format and map into our queue array
                     callQueue = contacts.map(c => ({
                         name: c.name ? c.name[0] : "Unknown",
                         phone: c.tel ? c.tel[0] : "",
-                        status: "pending" // pending, completed
+                        status: "pending"
                     }));
-                    currentIndex = 0;
-                    document.getElementById('active-panel').style.display = 'block';
-                    updateUI();
+                    initQueue();
                 }
             } catch (ex) {
-                console.log("Contact selection failed or cancelled.", ex);
+                console.log("Selection cancelled", ex);
             }
+        }
+
+        // 2. Excel / CSV File Parser
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Grab the first sheet
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Convert sheet to JSON array of rows
+                    const jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    let newQueue = [];
+                    // Loop through rows (assumes Column A = Name, Column B = Phone)
+                    jsonRows.forEach(row => {
+                        if (row && row.length >= 2) {
+                            let nameVal = String(row[0] || "").trim();
+                            let phoneVal = String(row[1] || "").trim();
+                            if (phoneVal) { // Ensure there is at least a phone number
+                                newQueue.push({
+                                    name: nameVal || "Client",
+                                    phone: phoneVal,
+                                    status: "pending"
+                                });
+                            }
+                        }
+                    });
+
+                    if (newQueue.length > 0) {
+                        callQueue = newQueue;
+                        initQueue();
+                    } else {
+                        alert("Could not find valid data. Ensure Column A is Name and Column B is Phone.");
+                    }
+                } catch (err) {
+                    alert("Error reading Excel file: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function initQueue() {
+            currentIndex = 0;
+            document.getElementById('active-panel').style.display = 'block';
+            updateUI();
         }
 
         function updateUI() {
@@ -85,13 +140,11 @@
             callQueue.forEach((item, index) => {
                 if (item.status === 'pending') pendingCount++;
 
-                // Render list
                 let div = document.createElement('div');
                 div.className = `queue-item ${item.status === 'completed' ? 'completed' : ''}`;
                 div.innerHTML = `<span>${index + 1}. ${item.name}</span> <span>${item.phone}</span>`;
                 listEl.appendChild(div);
 
-                // Set current active target if not found yet
                 if (item.status === 'pending' && !activeSet) {
                     currentIndex = index;
                     document.getElementById('target-info').innerText = `${item.name} — ${item.phone}`;
@@ -109,7 +162,6 @@
         }
 
         function redialCurrent() {
-            // Simply re-triggers the link click or lets them tap it again
             const currentItem = callQueue[currentIndex];
             if (currentItem) {
                 window.location.href = `tel:${currentItem.phone}`;
