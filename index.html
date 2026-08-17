@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#EDEFEA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Queue Dialer</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,12 +37,14 @@
     --shadow: 0 8px 28px rgba(0,0,0,.45);
   }
   *{box-sizing:border-box;}
+  html{ min-height:100%; background:var(--bg); }
   body{
     font-family:var(--font-ui); background:var(--bg); color:var(--text-main);
-    margin:0; padding:20px 14px 90px; max-width:480px; margin-inline:auto;
+    margin:0 auto; padding:20px 14px calc(90px + env(safe-area-inset-bottom)); max-width:480px;
     -webkit-font-smoothing:antialiased; transition:background .25s ease,color .25s ease;
   }
   ::selection{ background:var(--green-soft); }
+  button, input, textarea{ -webkit-tap-highlight-color:transparent; }
 
   /* ---- Header ---- */
   .app-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
@@ -53,6 +58,7 @@
     padding:6px 10px; display:none; align-items:center; gap:5px;
   }
   .timer-pill.show{ display:inline-flex; }
+  .timer-pill.paused .timer-dot{ background:var(--amber); animation:none; }
   .timer-dot{ width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
   @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
   .icon-btn{
@@ -65,15 +71,14 @@
   /* ---- Step tracker ---- */
   .steps{ display:flex; align-items:center; gap:6px; margin:2px 0 18px; padding:0 2px; }
   .step{ display:flex; align-items:center; gap:6px; flex:1; }
-  .step-dot{
-    width:7px; height:7px; border-radius:50%; background:var(--card-border); flex-shrink:0; transition:background .3s;
-  }
+  .step-dot{ width:7px; height:7px; border-radius:50%; background:var(--card-border); flex-shrink:0; transition:background .3s; }
   .step-label{ font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-faint); transition:color .3s; }
   .step.active .step-dot{ background:var(--green); }
   .step.active .step-label{ color:var(--text-main); }
   .step-line{ flex:1; height:1px; background:var(--card-border); }
 
   h3{ font-size:13.5px; margin:0 0 12px; font-weight:700; letter-spacing:-.005em; }
+  h4{ color:var(--text-main); }
   .hint{ font-size:12.5px; color:var(--text-muted); line-height:1.5; margin:0 0 12px; }
 
   .card{
@@ -86,7 +91,7 @@
     display:flex; align-items:center; justify-content:center; gap:6px; width:100%;
     background:var(--text-main); color:var(--bg); border:none; padding:13px 18px;
     border-radius:var(--radius-pill); font-size:14px; font-weight:700; font-family:var(--font-ui);
-    cursor:pointer; text-decoration:none; box-sizing:border-box; transition:transform .1s ease, opacity .2s;
+    cursor:pointer; text-decoration:none; box-sizing:border-box; transition:transform .1s ease, opacity .2s, background .2s;
   }
   .btn:active{ transform:scale(.98); }
   .btn-green{ background:var(--green); color:#fff; }
@@ -112,10 +117,17 @@
   input[type="text"], input[type="tel"]{
     width:100%; padding:11px 13px; border:1px solid var(--card-border); border-radius:var(--radius-sm);
     font-size:14px; margin-bottom:9px; background:var(--bg-alt); color:var(--text-main);
-    font-family:var(--font-ui); transition:border-color .2s;
+    font-family:var(--font-ui); transition:border-color .2s, box-shadow .2s;
   }
-  input[type="text"]:focus, input[type="tel"]:focus{ outline:none; border-color:var(--green); }
+  input[type="text"]:focus, input[type="tel"]:focus{ outline:none; border-color:var(--green); box-shadow:0 0 0 3px var(--green-soft); }
   label.field-label{ font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:5px; }
+
+  textarea#call-notes{
+    width:100%; padding:11px 13px; border:1px solid var(--card-border); border-radius:var(--radius-sm);
+    font-size:13px; margin-bottom:14px; background:var(--bg-alt); color:var(--text-main);
+    font-family:var(--font-ui); resize:vertical; min-height:52px; transition:border-color .2s, box-shadow .2s;
+  }
+  textarea#call-notes:focus{ outline:none; border-color:var(--green); box-shadow:0 0 0 3px var(--green-soft); }
 
   /* ---- Selectable contact list ---- */
   .select-toolbar{ display:flex; align-items:center; justify-content:space-between; margin:2px 0 10px; }
@@ -123,7 +135,7 @@
   .select-links{ display:flex; gap:10px; }
   .select-links button{ background:none; border:none; color:var(--green); font-size:11.5px; font-weight:700; cursor:pointer; padding:0; font-family:var(--font-ui); }
 
-  .scroll-box{ max-height:230px; overflow-y:auto; border:1px solid var(--card-border); border-radius:var(--radius-sm); background:var(--bg-alt); }
+  .scroll-box{ max-height:230px; overflow-y:auto; border:1px solid var(--card-border); border-radius:var(--radius-sm); background:var(--bg-alt); -webkit-overflow-scrolling:touch; }
   .contact-row{ display:flex; align-items:center; padding:10px 12px; border-bottom:1px solid var(--card-border); font-size:13px; }
   .contact-row:last-child{ border-bottom:none; }
   .contact-row label{ display:flex; align-items:center; gap:10px; width:100%; cursor:pointer; }
@@ -151,16 +163,16 @@
   .board-cell.skipped{ background:var(--slate); }
 
   /* ---- Active call panel ---- */
-  .call-progress{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); text-align:center; margin-bottom:12px; }
+  .call-progress{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); text-align:center; margin-bottom:6px; }
+  .session-status{ font-size:11.5px; text-align:center; color:var(--amber); font-weight:700; min-height:14px; margin-bottom:8px; }
   .target-box{ text-align:center; padding:22px 14px; background:var(--bg-alt); border-radius:var(--radius-sm); margin-bottom:14px; }
   .target-name{ font-size:17px; font-weight:800; margin:0 0 5px; }
   .target-phone{ font-family:var(--font-mono); font-size:20px; letter-spacing:.02em; color:var(--text-main); margin:0; }
-  .target-empty{ font-size:13.5px; color:var(--text-muted); padding:8px 0; }
 
   .dial-btn{
     display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
     background:var(--green); color:#fff; border:none; padding:16px; border-radius:var(--radius-pill);
-    font-size:15px; font-weight:800; text-decoration:none; margin-bottom:8px; transition:transform .1s;
+    font-size:15px; font-weight:800; text-decoration:none; margin-bottom:8px; transition:transform .1s, opacity .2s;
   }
   .dial-btn:active{ transform:scale(.98); }
   .redial-link{ display:block; text-align:center; font-size:12px; color:var(--text-muted); text-decoration:underline; margin-bottom:16px; background:none; border:none; cursor:pointer; width:100%; font-family:var(--font-ui); padding:4px; }
@@ -183,13 +195,6 @@
 
   .call-actions-row{ display:flex; gap:8px; margin-bottom:14px; }
   .call-actions-row .btn{ flex:1; }
-
-  textarea#call-notes{
-    width:100%; padding:11px 13px; border:1px solid var(--card-border); border-radius:var(--radius-sm);
-    font-size:13px; margin-bottom:14px; background:var(--bg-alt); color:var(--text-main);
-    font-family:var(--font-ui); resize:vertical; min-height:52px; transition:border-color .2s;
-  }
-  textarea#call-notes:focus{ outline:none; border-color:var(--green); }
 
   /* ---- Queue list ---- */
   .queue-item{ display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid var(--card-border); font-size:12.5px; }
@@ -214,14 +219,36 @@
   .report-group{ margin-bottom:14px; }
   .report-group-title{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
   .report-group-title .rg-dot{ width:8px; height:8px; border-radius:50%; }
-  .report-line{ font-size:12.5px; padding:5px 0; color:var(--text-main); display:flex; justify-content:space-between; border-bottom:1px solid var(--card-border); }
+  .report-line{ font-size:12.5px; padding:5px 0; color:var(--text-main); display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--card-border); }
   .report-line:last-child{ border-bottom:none; }
-  .report-line .rl-phone{ font-family:var(--font-mono); color:var(--text-muted); font-size:11.5px; }
+  .report-line .rl-phone{ font-family:var(--font-mono); color:var(--text-muted); font-size:11.5px; flex-shrink:0; }
   .report-empty{ font-size:12px; color:var(--text-faint); padding:4px 0; }
 
-  .sr-only{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
-  a.btn:focus-visible, button:focus-visible, input:focus-visible{ outline:2px solid var(--green); outline-offset:2px; }
-  @media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+  /* ---- Modal ---- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-end;
+    justify-content:center; padding:16px; z-index:1000; opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  .modal-backdrop.show{ opacity:1; pointer-events:auto; }
+  .modal{
+    width:100%; max-width:448px; background:var(--card-bg); color:var(--text-main);
+    border:1px solid var(--card-border); border-radius:22px; padding:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.2); transform:translateY(20px); transition:transform .2s ease;
+  }
+  .modal-backdrop.show .modal{ transform:translateY(0); }
+  .modal h3{ margin-bottom:7px; font-size:16px; }
+  .modal p{ margin:0 0 16px; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
+  .modal-actions{ display:grid; gap:8px; }
+  .modal-actions .btn{ width:100%; }
+
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  a.btn:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible{ outline:2px solid var(--green); outline-offset:2px; }
+  @media (max-width:380px){
+    body{ padding-left:10px; padding-right:10px; }
+    .card{ padding:17px; }
+    .qi-phone{ font-size:10.5px; }
+  }
+  @media (prefers-reduced-motion: reduce){ *,*::before,*::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; } }
 </style>
 </head>
 <body>
@@ -233,11 +260,11 @@
     </div>
     <div class="header-actions">
       <span class="timer-pill" id="timer-pill"><span class="timer-dot"></span><span id="timer-text">00:00</span></span>
-      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" aria-label="Toggle appearance" title="Toggle appearance">◐</button>
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" aria-label="Toggle appearance" aria-pressed="false" title="Toggle appearance" type="button">◐</button>
     </div>
   </header>
 
-  <nav class="steps" id="step-tracker" aria-hidden="true">
+  <nav class="steps" id="step-tracker" aria-label="Dialer progress">
     <div class="step active" id="step-1"><span class="step-dot"></span><span class="step-label">Import</span></div>
     <span class="step-line"></span>
     <div class="step" id="step-2"><span class="step-dot"></span><span class="step-label">Select</span></div>
@@ -248,25 +275,23 @@
   <!-- Step 1: Import -->
   <section class="card" id="upload-card">
     <h3>Load contacts</h3>
-    <p class="hint">Import directly from your phone's contact app, upload a spreadsheet (XLSX, XLS, CSV)[span_0](start_span)[span_0](end_span), or build manually.</p>
-    
-    <!-- Native Contact App Picker Button matching the design system -->
-    <button class="btn btn-green" style="margin-bottom: 10px;" onclick="openNativeContactPicker()">📱 Open Phone Contacts App</button>
+    <p class="hint">Import contacts from your phone, upload a spreadsheet (XLSX, XLS, CSV), or build the queue manually.</p>
+
+    <button class="btn btn-green" style="margin-bottom:10px;" onclick="openNativeContactPicker()" type="button">📱 Import from phone contacts</button>
 
     <label class="file-drop" id="drop-zone" for="excel-file">
       <div class="fd-icon">⇪</div>
       <div class="fd-main">Choose or drop a spreadsheet file</div>
-      <div class="fd-sub">XLSX · XLS · CSV[span_1](start_span)[span_1](end_span)</div>
+      <div class="fd-sub">XLSX · XLS · CSV</div>
     </label>
     <input type="file" id="excel-file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event)">
-
-    <button class="btn btn-ghost" style="margin-top:6px;" onclick="skipToQueue()">Skip — build queue manually</button>
+    <button class="btn btn-ghost" style="margin-top:6px;" onclick="skipToQueue()" type="button">Skip — build queue manually</button>
   </section>
 
   <!-- Step 2: Select -->
   <section class="card" id="search-card" style="display:none;">
     <h3>Select recipients</h3>
-    <input type="text" id="search-box" placeholder="Search by name or number…" oninput="filterMasterList()" aria-label="Search contacts">
+    <input type="text" id="search-box" placeholder="Search by name or number…" oninput="filterMasterList()" aria-label="Search contacts" autocomplete="off">
     <div class="select-toolbar">
       <span class="select-count" id="select-count">0 selected</span>
       <span class="select-links">
@@ -275,13 +300,14 @@
       </span>
     </div>
     <div class="scroll-box" id="master-contact-list"></div>
-    <button class="btn btn-green" style="margin-top:14px;" id="create-queue-btn" onclick="generateQueue()" disabled>Create queue</button>
+    <button class="btn btn-green" style="margin-top:14px;" id="create-queue-btn" onclick="generateQueue()" disabled type="button">Create queue</button>
   </section>
 
   <!-- Step 3: Active call -->
   <section class="card" id="active-panel" style="display:none;" aria-live="polite">
     <h3>Current call</h3>
     <p class="call-progress" id="call-progress">—</p>
+    <div class="session-status" id="session-status"></div>
 
     <div class="board-wrap">
       <div class="board-label">Queue board</div>
@@ -294,25 +320,25 @@
     </div>
 
     <a id="dial-link" href="#" class="dial-btn">📞 Call now</a>
-    <button class="redial-link" id="redial-btn" onclick="redialCurrent()">Didn't connect? Redial</button>
+    <button class="redial-link" id="redial-btn" onclick="redialCurrent()" type="button">Didn't connect? Redial</button>
 
     <label class="field-label" for="call-notes">Notes (optional)</label>
     <textarea id="call-notes" placeholder="Objections, callback time, context…" oninput="updateNote(this.value)"></textarea>
 
     <div class="call-actions-row">
-      <button class="btn btn-ghost btn-sm" id="undo-btn" onclick="undoLast()" disabled>↺ Undo last</button>
-      <button class="btn btn-ghost btn-sm" id="skip-btn" onclick="skipCurrent()">⤼ Skip contact</button>
+      <button class="btn btn-ghost btn-sm" id="undo-btn" onclick="undoLast()" disabled type="button">↺ Undo last</button>
+      <button class="btn btn-ghost btn-sm" id="skip-btn" onclick="skipCurrent()" type="button">⤼ Skip contact</button>
     </div>
 
     <p class="outcome-label">Log outcome &amp; move to next</p>
     <div class="outcome-grid">
-      <button class="outcome-btn oc-answered" onclick="setOutcome('answered')">✓ Answered</button>
-      <button class="outcome-btn oc-no-answer" onclick="setOutcome('no-answer')">✕ No answer</button>
-      <button class="outcome-btn oc-voicemail" onclick="setOutcome('voicemail')">◐ Voicemail</button>
-      <button class="outcome-btn oc-callback" onclick="setOutcome('callback')">↻ Call back</button>
+      <button class="outcome-btn oc-answered" onclick="setOutcome('answered')" type="button">✓ Answered</button>
+      <button class="outcome-btn oc-no-answer" onclick="setOutcome('no-answer')" type="button">✕ No answer</button>
+      <button class="outcome-btn oc-voicemail" onclick="setOutcome('voicemail')" type="button">◐ Voicemail</button>
+      <button class="outcome-btn oc-callback" onclick="setOutcome('callback')" type="button">↻ Call back</button>
     </div>
 
-    <button class="btn stop-btn" onclick="promptBreakOrEnd()">Pause or end session</button>
+    <button class="btn stop-btn" onclick="openSessionModal()" type="button">Pause or end session</button>
   </section>
 
   <!-- Step 4: Queue list + manual add -->
@@ -323,10 +349,10 @@
     <div class="manual-section">
       <h4 style="margin:0 0 10px; font-size:12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em;">Add a number</h4>
       <label class="field-label" for="manual-name">Name</label>
-      <input type="text" id="manual-name" placeholder="Priya Nair">
-      <label class="field-label" for="manual-phone">Phone (10 digits)</label>
-      <input type="tel" id="manual-phone" placeholder="9876543210" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)" inputmode="tel">
-      <button class="btn btn-ghost" onclick="addManualNumber()">Add to queue</button>
+      <input type="text" id="manual-name" placeholder="e.g. Priya Nair" autocomplete="off">
+      <label class="field-label" for="manual-phone">Phone</label>
+      <input type="tel" id="manual-phone" placeholder="e.g. 98765 43210" inputmode="tel" autocomplete="tel">
+      <button class="btn btn-ghost" onclick="addManualNumber()" type="button">Add to queue</button>
     </div>
   </section>
 
@@ -336,15 +362,28 @@
     <div class="stat-grid" id="stat-grid"></div>
     <div id="report-groups"></div>
     <div class="btn-block-group" style="margin-top:6px;">
-      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="copyReport()">Copy</button>
-      <button class="btn btn-green btn-sm" style="flex:1;" onclick="sendWhatsApp()">WhatsApp</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="copyReport()" type="button">Copy</button>
+      <button class="btn btn-green btn-sm" style="flex:1;" onclick="sendWhatsApp()" type="button">WhatsApp</button>
     </div>
     <div class="btn-block-group" style="margin-top:8px;">
-      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="downloadReport()">Download .txt</button>
-      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="downloadReportCSV()">Download .csv</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="downloadReport()" type="button">Download .txt</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="downloadReportCSV()" type="button">Download .csv</button>
     </div>
-    <button class="btn btn-ghost" style="margin-top:8px;" onclick="resetApp()">Start new session</button>
+    <button class="btn btn-ghost" style="margin-top:8px;" onclick="resetApp()" type="button">Start new session</button>
   </section>
+
+  <!-- Session modal -->
+  <div class="modal-backdrop" id="session-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+    <div class="modal">
+      <h3 id="modal-title">Session options</h3>
+      <p>Pause the current session or finish the list and view the report.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="pause-resume-btn" onclick="handlePauseResume()" type="button">Pause session</button>
+        <button class="btn btn-green" onclick="endSessionFromModal()" type="button">End list &amp; view report</button>
+        <button class="btn btn-ghost" onclick="closeSessionModal()" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 (function(){
@@ -355,17 +394,38 @@
   let selectedIds = new Set();  // ids chosen in the select step
   let callQueue = [];           // {name, phone, status, note}
   let currentIndex = -1;
-  let sessionStart = null;
+  let sessionStart = null;      // Date.now() when the timer last (re)started
+  let elapsedBeforePause = 0;   // accumulated seconds before the current run
+  let sessionPaused = false;
   let timerHandle = null;
   let manualTheme = false;      // true once the user overrides the system theme
-  let outcomeHistory = [];      // stack of indices for Undo
+  let outcomeHistory = [];      // stack of {index, previousStatus, previousNote} for Undo
+
+  const STORAGE_KEY = 'queueDialerSession_v1';
+  const THEME_KEY = 'queueDialerTheme';
 
   const OUTCOME_META = {
-    'answered':  { label: 'Answered',   color: 'var(--green)', soft: 'var(--green-soft)' },
-    'no-answer': { label: 'No answer',  color: 'var(--red)',   soft: 'var(--red-soft)'   },
-    'voicemail': { label: 'Voicemail',  color: 'var(--blue)',  soft: 'var(--blue-soft)'  },
-    'callback':  { label: 'Call back',  color: 'var(--amber)', soft: 'var(--amber-soft)' }
+    'answered':  { label: 'Answered',   color: 'var(--green)' },
+    'no-answer': { label: 'No answer',  color: 'var(--red)'   },
+    'voicemail': { label: 'Voicemail',  color: 'var(--blue)'  },
+    'callback':  { label: 'Call back',  color: 'var(--amber)' }
   };
+
+  // ---------- Storage (best-effort — see note below) ----------
+  // localStorage isn't available inside Claude.ai's inline artifact preview
+  // sandbox, so every call here is wrapped in try/catch and fails silently.
+  // Once this file is hosted for real (GitHub Pages, "Add to Home Screen",
+  // opened directly), storage works normally and sessions survive a reload.
+  function saveState(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        callQueue, currentIndex, elapsedBeforePause, outcomeHistory
+      }));
+    } catch (err) { /* storage unavailable — session just won't persist */ }
+  }
+  function clearSavedState(){
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) {}
+  }
 
   // ---------- Theme ----------
   function applyTheme(dark){
@@ -373,14 +433,24 @@
     else document.documentElement.removeAttribute('data-theme');
     document.getElementById('theme-btn').textContent = dark ? '◑' : '◐';
     document.getElementById('theme-btn').setAttribute('aria-pressed', String(dark));
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#101208' : '#EDEFEA');
   }
-  applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+  (function initTheme(){
+    let stored = null;
+    try { stored = localStorage.getItem(THEME_KEY); } catch (err) {}
+    if (stored === 'dark') { manualTheme = true; applyTheme(true); return; }
+    if (stored === 'light') { manualTheme = true; applyTheme(false); return; }
+    applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+  })();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if (!manualTheme) applyTheme(e.matches);
   });
   window.toggleTheme = function(){
     manualTheme = true;
-    applyTheme(!document.documentElement.hasAttribute('data-theme'));
+    const dark = !document.documentElement.hasAttribute('data-theme');
+    applyTheme(dark);
+    try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (err) {}
   };
 
   // ---------- Helpers ----------
@@ -389,13 +459,14 @@
   }
 
   function sanitizePhone(raw){
-    const hasPlus = raw.trim().startsWith('+');
-    const digits = raw.replace(/\D/g, '');
+    const str = String(raw == null ? '' : raw).trim();
+    const hasPlus = str.startsWith('+');
+    const digits = str.replace(/\D/g, '');
     return (hasPlus ? '+' : '') + digits;
   }
 
   function digitCount(sanitized){
-    return sanitized.replace(/\D/g, '').length;
+    return String(sanitized || '').replace(/\D/g, '').length;
   }
 
   function setStep(n){
@@ -404,7 +475,33 @@
     }
   }
 
-  // ---------- Step 1: Import & Native Contact Picker ----------
+  // Shared by spreadsheet import and the contacts picker: cleans, validates
+  // and de-dupes a raw {name, phone} list into the master contact list.
+  function normalizeContacts(rawList){
+    const result = [];
+    const seenPhones = new Set();
+    rawList.forEach(c => {
+      const name = String(c.name || 'Unknown').trim() || 'Unknown';
+      const phone = sanitizePhone(c.phone);
+      if (digitCount(phone) < 5) return;      // too short to be a real number
+      if (seenPhones.has(phone)) return;       // dedupe
+      seenPhones.add(phone);
+      result.push({ id: result.length, name, phone });
+    });
+    return result;
+  }
+
+  function loadContactsIntoSelectStep(contacts){
+    masterContacts = contacts;
+    selectedIds = new Set();
+    document.getElementById('upload-card').style.display = 'none';
+    document.getElementById('search-card').style.display = 'block';
+    renderMasterList(masterContacts);
+    updateSelectCount();
+    setStep(2);
+  }
+
+  // ---------- Step 1: Spreadsheet import ----------
   const dropZone = document.getElementById('drop-zone');
   ['dragover','dragenter'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('drag'); }));
   ['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('drag'); }));
@@ -416,89 +513,89 @@
   window.handleFileUpload = function(event){
     const file = event.target.files[0];
     if (file) readWorkbook(file);
-  };
-
-  // Native Android Contact Picker API Integration matching app theme
-  window.openNativeContactPicker = async function(){
-    const supported = ('contacts' in navigator && 'ContactsManager' in window);
-    if (!supported) {
-      alert("Your browser or device does not support direct contact app selection. Please use Chrome on Android or upload a spreadsheet file.");
-      return;
-    }
-
-    try {
-      const props = ['name', 'tel'];
-      const opts = { multiple: true };
-      const contacts = await navigator.contacts.select(props, opts);
-      
-      if (contacts && contacts.length > 0) {
-        callQueue = contacts.map(c => ({
-          name: c.name && c.name[0] ? c.name[0] : "Selected Contact",
-          phone: c.tel && c.tel[0] ? sanitizePhone(c.tel[0]) : "",
-          status: "pending",
-          note: ""
-        })).filter(c => digitCount(c.phone) >= 7);
-
-        if (callQueue.length > 0) {
-          document.getElementById('upload-card').style.display = 'none';
-          enterCallView();
-        } else {
-          alert("The selected contacts did not contain valid phone numbers.");
-        }
-      }
-    } catch (err) {
-      console.log("Contact selection cancelled or failed", err);
-    }
+    event.target.value = '';
   };
 
   function readWorkbook(file){
+    if (typeof XLSX === 'undefined'){
+      alert('The spreadsheet reader could not load. Check your connection and refresh.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = function(e){
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (!rows.length) throw new Error('The spreadsheet is empty.');
 
+        // Skip a header row if column B on row 1 doesn't look like a phone number.
         let startIdx = 0;
-        if (rows.length && rows[0] && rows[0][1] != null) {
-          const firstPhoneCell = String(rows[0][1]);
-          if (!/\d{3,}/.test(firstPhoneCell)) startIdx = 1;
-        }
+        const firstPhoneCell = String((rows[0] && rows[0][1]) || '').trim();
+        if (firstPhoneCell && !/\d{3,}/.test(firstPhoneCell)) startIdx = 1;
 
-        masterContacts = [];
-        const seenPhones = new Set();
+        const rawContacts = [];
         for (let idx = startIdx; idx < rows.length; idx++){
           const row = rows[idx];
           if (!row || row.length < 2) continue;
-          const nameVal = String(row[0] || '').trim();
           const phoneRaw = String(row[1] || '').trim();
           if (!phoneRaw) continue;
-          const phone = sanitizePhone(phoneRaw);
-          if (digitCount(phone) < 5) continue;
-          if (seenPhones.has(phone)) continue;
-          seenPhones.add(phone);
-          masterContacts.push({ id: masterContacts.length, name: nameVal || 'Unknown', phone });
+          rawContacts.push({ name: String(row[0] || '').trim(), phone: phoneRaw });
         }
 
-        if (masterContacts.length > 0) {
-          document.getElementById('upload-card').style.display = 'none';
-          document.getElementById('search-card').style.display = 'block';
-          selectedIds = new Set();
-          renderMasterList(masterContacts);
-          updateSelectCount();
-          setStep(2);
-        } else {
+        const contacts = normalizeContacts(rawContacts);
+        if (!contacts.length){
           alert('No valid phone numbers found. Column A should be Name, Column B should be Phone.');
+          return;
         }
+        loadContactsIntoSelectStep(contacts);
+        saveState();
       } catch (err) {
         alert('Could not read that file: ' + err.message);
       }
     };
+    reader.onerror = function(){ alert('The file could not be read.'); };
     reader.readAsArrayBuffer(file);
   }
 
+  // ---------- Step 1: Native contact picker ----------
+  // Uses the browser's Contact Picker API (navigator.contacts.select), a real
+  // system contact chooser — currently supported on Chrome for Android. Falls
+  // back to a message pointing at spreadsheet import everywhere else.
+  window.openNativeContactPicker = async function(){
+    const supported = 'contacts' in navigator && 'ContactsManager' in window && typeof navigator.contacts.select === 'function';
+    if (!supported){
+      alert("Your browser doesn't support picking contacts directly.\n\nUse spreadsheet import (XLSX/CSV) or add numbers manually instead.");
+      return;
+    }
+    try {
+      const picked = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+      if (!picked || !picked.length) return;
+
+      const rawContacts = [];
+      picked.forEach(c => {
+        const name = (c.name && c.name.length) ? c.name[0] : 'Selected contact';
+        const phones = Array.isArray(c.tel) ? c.tel : [];
+        if (phones.length) rawContacts.push({ name, phone: phones[0] });
+      });
+
+      const contacts = normalizeContacts(rawContacts);
+      if (!contacts.length){
+        alert('The selected contacts did not include a usable phone number.');
+        return;
+      }
+      loadContactsIntoSelectStep(contacts);
+      saveState();
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // user cancelled — not an error
+      alert('Contacts could not be imported. Try spreadsheet import instead.');
+    }
+  };
+
   window.skipToQueue = function(){
+    masterContacts = [];
+    selectedIds = new Set();
     document.getElementById('upload-card').style.display = 'none';
     enterCallView();
   };
@@ -506,11 +603,10 @@
   // ---------- Step 2: Select ----------
   const masterListEl = document.getElementById('master-contact-list');
   masterListEl.addEventListener('change', function(e){
-    if (e.target.matches('input.contact-checkbox')){
-      const id = parseInt(e.target.value, 10);
-      if (e.target.checked) selectedIds.add(id); else selectedIds.delete(id);
-      updateSelectCount();
-    }
+    if (!e.target.matches('input.contact-checkbox')) return;
+    const id = parseInt(e.target.value, 10);
+    if (e.target.checked) selectedIds.add(id); else selectedIds.delete(id);
+    updateSelectCount();
   });
 
   function renderMasterList(contacts){
@@ -531,15 +627,13 @@
   }
 
   window.filterMasterList = function(){
-    const query = document.getElementById('search-box').value.toLowerCase();
-    const filtered = masterContacts.filter(c =>
-      c.name.toLowerCase().includes(query) || c.phone.includes(query)
-    );
+    const query = document.getElementById('search-box').value.toLowerCase().trim();
+    const filtered = masterContacts.filter(c => c.name.toLowerCase().includes(query) || c.phone.includes(query));
     renderMasterList(filtered);
   };
 
   window.selectAllVisible = function(){
-    const query = document.getElementById('search-box').value.toLowerCase();
+    const query = document.getElementById('search-box').value.toLowerCase().trim();
     masterContacts
       .filter(c => c.name.toLowerCase().includes(query) || c.phone.includes(query))
       .forEach(c => selectedIds.add(c.id));
@@ -562,6 +656,7 @@
     callQueue = masterContacts
       .filter(c => selectedIds.has(c.id))
       .map(c => ({ name: c.name, phone: c.phone, status: 'pending', note: '' }));
+    if (!callQueue.length){ alert('Select at least one contact.'); return; }
     document.getElementById('search-card').style.display = 'none';
     enterCallView();
   };
@@ -570,17 +665,34 @@
   function enterCallView(){
     document.getElementById('active-panel').style.display = 'block';
     document.getElementById('queue-card').style.display = 'block';
+    document.getElementById('report-card').style.display = 'none';
     setStep(3);
+    if (currentIndex === -1) currentIndex = callQueue.findIndex(c => c.status === 'pending');
+    if (!sessionStart && !sessionPaused){ sessionStart = Date.now(); elapsedBeforePause = 0; }
     startTimer();
-    currentIndex = callQueue.findIndex(c => c.status === 'pending');
     renderAll();
+    saveState();
+  }
+
+  function totalElapsedSeconds(){
+    if (!sessionStart || sessionPaused) return elapsedBeforePause;
+    return elapsedBeforePause + Math.floor((Date.now() - sessionStart) / 1000);
   }
 
   function startTimer(){
-    if (sessionStart) return;
-    sessionStart = Date.now();
+    if (timerHandle || sessionPaused) return;
     document.getElementById('timer-pill').classList.add('show');
+    document.getElementById('timer-pill').classList.remove('paused');
     timerHandle = setInterval(updateTimer, 1000);
+    updateTimer();
+  }
+  function pauseTimer(){
+    if (sessionStart) elapsedBeforePause += Math.floor((Date.now() - sessionStart) / 1000);
+    sessionStart = null;
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = null;
+    sessionPaused = true;
+    document.getElementById('timer-pill').classList.add('show', 'paused');
     updateTimer();
   }
   function stopTimer(){
@@ -588,7 +700,7 @@
     timerHandle = null;
   }
   function updateTimer(){
-    const secs = Math.floor((Date.now() - sessionStart) / 1000);
+    const secs = totalElapsedSeconds();
     const mm = String(Math.floor(secs / 60)).padStart(2, '0');
     const ss = String(secs % 60).padStart(2, '0');
     document.getElementById('timer-text').textContent = mm + ':' + ss;
@@ -604,9 +716,8 @@
     const nameInput = document.getElementById('manual-name').value.trim();
     const rawPhone = document.getElementById('manual-phone').value.trim();
     const phone = sanitizePhone(rawPhone);
-    
-    if (phone.length !== 10){
-      alert('Phone number must be exactly 10 digits.');
+    if (digitCount(phone) < 7 || digitCount(phone) > 15){
+      alert('Enter a valid phone number (7–15 digits).');
       return;
     }
     if (callQueue.some(c => c.phone === phone)){
@@ -617,12 +728,13 @@
     document.getElementById('manual-name').value = '';
     document.getElementById('manual-phone').value = '';
     if (currentIndex === -1) currentIndex = callQueue.length - 1;
-    if (!sessionStart){
-      document.getElementById('active-panel').style.display = 'block';
-      setStep(3);
-      startTimer();
-    }
+    if (!sessionStart && !sessionPaused){ sessionStart = Date.now(); elapsedBeforePause = 0; }
+    document.getElementById('active-panel').style.display = 'block';
+    document.getElementById('queue-card').style.display = 'block';
+    setStep(3);
+    startTimer();
     renderAll();
+    saveState();
   };
 
   function renderAll(){
@@ -645,8 +757,10 @@
     board.innerHTML = html;
     board.querySelectorAll('.board-cell.clickable').forEach(cell => {
       cell.addEventListener('click', () => {
+        if (sessionPaused) return;
         currentIndex = parseInt(cell.dataset.index, 10);
         renderAll();
+        saveState();
       });
     });
   }
@@ -681,13 +795,17 @@
     const undoBtn = document.getElementById('undo-btn');
     const notesEl = document.getElementById('call-notes');
     const outcomeBtns = document.querySelectorAll('.outcome-btn');
+    const statusEl = document.getElementById('session-status');
 
     undoBtn.disabled = outcomeHistory.length === 0;
+    statusEl.textContent = sessionPaused ? 'Session paused' : '';
 
-    if (currentIndex === -1 || !callQueue[currentIndex] || callQueue[currentIndex].status !== 'pending'){
+    const doneOrEmpty = currentIndex === -1 || !callQueue[currentIndex] || callQueue[currentIndex].status !== 'pending';
+    if (doneOrEmpty){
       document.getElementById('target-name').textContent = callQueue.length ? 'All calls logged 🎉' : 'No one queued yet';
       document.getElementById('target-phone').textContent = '—';
       document.getElementById('call-progress').textContent = callQueue.length ? (callQueue.length - remainingCount()) + ' of ' + callQueue.length + ' logged' : '—';
+      dialLink.removeAttribute('href');
       dialLink.style.pointerEvents = 'none';
       dialLink.style.opacity = '.4';
       redialBtn.disabled = true;
@@ -702,18 +820,28 @@
     document.getElementById('target-name').textContent = item.name;
     document.getElementById('target-phone').textContent = item.phone;
     document.getElementById('call-progress').textContent = 'Contact ' + (currentIndex + 1) + ' of ' + callQueue.length + ' · ' + remainingCount() + ' remaining';
-    dialLink.href = 'tel:' + item.phone;
-    dialLink.style.pointerEvents = 'auto';
-    dialLink.style.opacity = '1';
-    redialBtn.disabled = false;
-    skipBtn.disabled = false;
-    notesEl.disabled = false;
+
+    if (sessionPaused){
+      dialLink.removeAttribute('href');
+      dialLink.style.pointerEvents = 'none';
+      dialLink.style.opacity = '.4';
+    } else {
+      dialLink.href = 'tel:' + item.phone;
+      dialLink.style.pointerEvents = 'auto';
+      dialLink.style.opacity = '1';
+    }
+    redialBtn.disabled = sessionPaused;
+    skipBtn.disabled = sessionPaused;
+    notesEl.disabled = sessionPaused;
     notesEl.value = item.note || '';
-    outcomeBtns.forEach(b => b.disabled = false);
+    outcomeBtns.forEach(b => b.disabled = sessionPaused);
   }
 
   window.updateNote = function(value){
-    if (currentIndex > -1 && callQueue[currentIndex]) callQueue[currentIndex].note = value;
+    if (currentIndex > -1 && callQueue[currentIndex]){
+      callQueue[currentIndex].note = value;
+      saveState();
+    }
   };
 
   function remainingCount(){
@@ -721,52 +849,77 @@
   }
 
   window.redialCurrent = function(){
-    if (currentIndex >= 0 && callQueue[currentIndex]) window.location.href = 'tel:' + callQueue[currentIndex].phone;
+    if (sessionPaused || currentIndex < 0 || !callQueue[currentIndex]) return;
+    window.location.href = 'tel:' + callQueue[currentIndex].phone;
   };
 
-  window.setOutcome = function(status){
-    if (currentIndex === -1 || !callQueue[currentIndex]) return;
-    callQueue[currentIndex].status = status;
-    outcomeHistory.push(currentIndex);
+  function logOutcome(status){
+    if (sessionPaused || currentIndex === -1 || !callQueue[currentIndex]) return;
+    const item = callQueue[currentIndex];
+    outcomeHistory.push({ index: currentIndex, previousStatus: item.status, previousNote: item.note });
+    item.status = status;
     currentIndex = findNextPending(currentIndex);
     renderAll();
-  };
-
-  window.skipCurrent = function(){
-    if (currentIndex === -1 || !callQueue[currentIndex]) return;
-    callQueue[currentIndex].status = 'skipped';
-    outcomeHistory.push(currentIndex);
-    currentIndex = findNextPending(currentIndex);
-    renderAll();
-  };
+    saveState();
+  }
+  window.setOutcome = status => logOutcome(status);
+  window.skipCurrent = () => logOutcome('skipped');
 
   window.undoLast = function(){
-    if (outcomeHistory.length === 0) return;
-    const idx = outcomeHistory.pop();
-    if (callQueue[idx]) {
-      callQueue[idx].status = 'pending';
-      currentIndex = idx;
+    if (!outcomeHistory.length) return;
+    const action = outcomeHistory.pop();
+    if (callQueue[action.index]){
+      callQueue[action.index].status = action.previousStatus;
+      callQueue[action.index].note = action.previousNote;
+      currentIndex = action.index;
     }
     renderAll();
+    saveState();
   };
 
-  window.promptBreakOrEnd = function(){
-    const choice = prompt("Choose an option:\n1 = Take a Break (Pause session)\n2 = End List & View Report", "1");
-    if (choice === "1") {
-      alert("Session paused. Resume whenever ready!");
-    } else if (choice === "2") {
-      showReport();
-    }
+  // ---------- Session pause / end modal ----------
+  window.openSessionModal = function(){
+    document.getElementById('pause-resume-btn').textContent = sessionPaused ? 'Resume session' : 'Pause session';
+    const modal = document.getElementById('session-modal');
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
   };
+  window.closeSessionModal = function(){
+    const modal = document.getElementById('session-modal');
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+  };
+  window.handlePauseResume = function(){
+    if (sessionPaused){ sessionPaused = false; sessionStart = Date.now(); startTimer(); }
+    else { pauseTimer(); }
+    closeSessionModal();
+    renderActivePanel();
+    saveState();
+  };
+  window.endSessionFromModal = function(){
+    closeSessionModal();
+    showReport();
+  };
+  document.getElementById('session-modal').addEventListener('click', function(e){
+    if (e.target === this) closeSessionModal();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSessionModal(); });
 
   // ---------- Report ----------
+  function groupByStatus(){
+    const byStatus = { answered: [], 'no-answer': [], voicemail: [], callback: [], skipped: [], pending: [] };
+    callQueue.forEach(c => { (byStatus[c.status] || byStatus.pending).push(c); });
+    return byStatus;
+  }
+
   function showReport(){
     stopTimer();
+    if (sessionStart){ elapsedBeforePause += Math.floor((Date.now() - sessionStart) / 1000); sessionStart = null; }
+    sessionPaused = false;
     document.getElementById('active-panel').style.display = 'none';
     document.getElementById('queue-card').style.display = 'none';
 
     const byStatus = groupByStatus();
-
     const totalLogged = callQueue.length - byStatus.pending.length;
     const attempted = byStatus.answered.length + byStatus['no-answer'].length + byStatus.voicemail.length + byStatus.callback.length;
     const answerRate = attempted ? Math.round((byStatus.answered.length / attempted) * 100) : 0;
@@ -786,15 +939,16 @@
     document.getElementById('report-groups').innerHTML = groupsHtml;
 
     document.getElementById('report-card').style.display = 'block';
+    saveState();
   }
 
   function statBox(num, label){
-    return '<div class="stat-box"><div class="stat-num">' + num + '</div><div class="stat-label">' + label + '</div></div>';
+    return '<div class="stat-box"><div class="stat-num">' + escapeHtml(num) + '</div><div class="stat-label">' + escapeHtml(label) + '</div></div>';
   }
 
   function reportGroup(title, color, list){
     let html = '<div class="report-group"><div class="report-group-title" style="color:' + color + '">' +
-      '<span class="rg-dot" style="background:' + color + '"></span>' + title + ' (' + list.length + ')</div>';
+      '<span class="rg-dot" style="background:' + color + '"></span>' + escapeHtml(title) + ' (' + list.length + ')</div>';
     if (list.length === 0){
       html += '<div class="report-empty">None</div>';
     } else {
@@ -804,12 +958,6 @@
     }
     html += '</div>';
     return html;
-  }
-
-  function groupByStatus(){
-    const byStatus = { answered: [], 'no-answer': [], voicemail: [], callback: [], skipped: [], pending: [] };
-    callQueue.forEach(c => byStatus[c.status].push(c));
-    return byStatus;
   }
 
   function generateReportText(){
@@ -841,43 +989,92 @@
   }
 
   window.copyReport = function(){
-    navigator.clipboard.writeText(generateReportText()).then(
-      () => alert('Report copied to clipboard.'),
-      () => alert('Could not copy — your browser blocked clipboard access.')
-    );
+    const text = generateReportText();
+    if (navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(
+        () => alert('Report copied to clipboard.'),
+        () => fallbackCopy(text)
+      );
+    } else {
+      fallbackCopy(text);
+    }
   };
+
+  function fallbackCopy(text){
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      alert('Report copied to clipboard.');
+    } catch (err) {
+      alert('Could not copy automatically — use a Download option instead.');
+    }
+    document.body.removeChild(textarea);
+  }
 
   window.sendWhatsApp = function(){
     window.open('https://wa.me/?text=' + encodeURIComponent(generateReportText()), '_blank');
   };
 
-  window.downloadReport = function(){
-    const blob = new Blob([generateReportText()], { type: 'text/plain' });
+  function downloadBlob(blob, filename){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'call-session-report.txt';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
+  window.downloadReport = function(){
+    downloadBlob(new Blob([generateReportText()], { type: 'text/plain;charset=utf-8' }), 'call-session-report.txt');
+  };
   window.downloadReportCSV = function(){
-    const blob = new Blob([generateReportCSV()], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'call-session-report.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([generateReportCSV()], { type: 'text/csv;charset=utf-8' }), 'call-session-report.csv');
   };
 
   window.resetApp = function(){
-    if (confirm('Start a new session? This clears the current queue and report.')) location.reload();
+    if (!confirm('Start a new session? This clears the current queue and report.')) return;
+    stopTimer();
+    clearSavedState();
+    location.reload();
   };
+
+  // ---------- Restore a saved session on load ----------
+  (function restoreSession(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || !Array.isArray(saved.callQueue) || !saved.callQueue.length) return;
+      if (!confirm('A previous Queue Dialer session was found. Continue it?')){
+        clearSavedState();
+        return;
+      }
+      callQueue = saved.callQueue;
+      currentIndex = Number.isInteger(saved.currentIndex) ? saved.currentIndex : -1;
+      elapsedBeforePause = Number(saved.elapsedBeforePause) || 0;
+      outcomeHistory = Array.isArray(saved.outcomeHistory) ? saved.outcomeHistory : [];
+      sessionPaused = true;
+      sessionStart = null;
+
+      document.getElementById('upload-card').style.display = 'none';
+      document.getElementById('search-card').style.display = 'none';
+      document.getElementById('active-panel').style.display = 'block';
+      document.getElementById('queue-card').style.display = 'block';
+      setStep(3);
+      document.getElementById('timer-pill').classList.add('show', 'paused');
+      updateTimer();
+      renderAll();
+    } catch (err) {
+      clearSavedState();
+    }
+  })();
 })();
 </script>
 </body>
