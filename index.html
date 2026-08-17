@@ -101,7 +101,7 @@
 
   .file-drop{
     border:1.5px dashed var(--card-border); border-radius:var(--radius-sm); padding:22px 14px;
-    text-align:center; cursor:pointer; transition:background .2s,border-color .2s; display:block;
+    text-align:center; cursor:pointer; transition:background .2s,border-color .2s; display:block; margin-bottom:10px;
   }
   .file-drop:hover, .file-drop.drag{ background:var(--green-soft); border-color:var(--green); }
   .file-drop .fd-icon{ font-size:20px; margin-bottom:6px; }
@@ -248,14 +248,19 @@
   <!-- Step 1: Import -->
   <section class="card" id="upload-card">
     <h3>Load contacts</h3>
-    <p class="hint">Upload a spreadsheet with names in column A and phone numbers in column B — .xlsx, .xls or .csv.</p>
+    <p class="hint">Import directly from your phone's contact app, upload a spreadsheet (XLSX, XLS, CSV)[span_0](start_span)[span_0](end_span), or build manually.</p>
+    
+    <!-- Native Contact App Picker Button matching the design system -->
+    <button class="btn btn-green" style="margin-bottom: 10px;" onclick="openNativeContactPicker()">📱 Open Phone Contacts App</button>
+
     <label class="file-drop" id="drop-zone" for="excel-file">
       <div class="fd-icon">⇪</div>
-      <div class="fd-main">Choose or drop a file</div>
-      <div class="fd-sub">XLSX · XLS · CSV</div>
+      <div class="fd-main">Choose or drop a spreadsheet file</div>
+      <div class="fd-sub">XLSX · XLS · CSV[span_1](start_span)[span_1](end_span)</div>
     </label>
     <input type="file" id="excel-file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event)">
-    <button class="btn btn-ghost" style="margin-top:10px;" onclick="skipToQueue()">Skip — build queue manually</button>
+
+    <button class="btn btn-ghost" style="margin-top:6px;" onclick="skipToQueue()">Skip — build queue manually</button>
   </section>
 
   <!-- Step 2: Select -->
@@ -318,9 +323,9 @@
     <div class="manual-section">
       <h4 style="margin:0 0 10px; font-size:12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em;">Add a number</h4>
       <label class="field-label" for="manual-name">Name</label>
-      <input type="text" id="manual-name" placeholder="e.g. Priya Nair">
-      <label class="field-label" for="manual-phone">Phone</label>
-      <input type="tel" id="manual-phone" placeholder="e.g. 98765 43210" inputmode="tel">
+      <input type="text" id="manual-name" placeholder="Priya Nair">
+      <label class="field-label" for="manual-phone">Phone (10 digits)</label>
+      <input type="tel" id="manual-phone" placeholder="9876543210" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)" inputmode="tel">
       <button class="btn btn-ghost" onclick="addManualNumber()">Add to queue</button>
     </div>
   </section>
@@ -399,7 +404,7 @@
     }
   }
 
-  // ---------- Step 1: Import ----------
+  // ---------- Step 1: Import & Native Contact Picker ----------
   const dropZone = document.getElementById('drop-zone');
   ['dragover','dragenter'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('drag'); }));
   ['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('drag'); }));
@@ -413,6 +418,39 @@
     if (file) readWorkbook(file);
   };
 
+  // Native Android Contact Picker API Integration matching app theme
+  window.openNativeContactPicker = async function(){
+    const supported = ('contacts' in navigator && 'ContactsManager' in window);
+    if (!supported) {
+      alert("Your browser or device does not support direct contact app selection. Please use Chrome on Android or upload a spreadsheet file.");
+      return;
+    }
+
+    try {
+      const props = ['name', 'tel'];
+      const opts = { multiple: true };
+      const contacts = await navigator.contacts.select(props, opts);
+      
+      if (contacts && contacts.length > 0) {
+        callQueue = contacts.map(c => ({
+          name: c.name && c.name[0] ? c.name[0] : "Selected Contact",
+          phone: c.tel && c.tel[0] ? sanitizePhone(c.tel[0]) : "",
+          status: "pending",
+          note: ""
+        })).filter(c => digitCount(c.phone) >= 7);
+
+        if (callQueue.length > 0) {
+          document.getElementById('upload-card').style.display = 'none';
+          enterCallView();
+        } else {
+          alert("The selected contacts did not contain valid phone numbers.");
+        }
+      }
+    } catch (err) {
+      console.log("Contact selection cancelled or failed", err);
+    }
+  };
+
   function readWorkbook(file){
     const reader = new FileReader();
     reader.onload = function(e){
@@ -422,7 +460,6 @@
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        // Skip a header row if column B on row 1 doesn't look like a phone number.
         let startIdx = 0;
         if (rows.length && rows[0] && rows[0][1] != null) {
           const firstPhoneCell = String(rows[0][1]);
@@ -438,8 +475,8 @@
           const phoneRaw = String(row[1] || '').trim();
           if (!phoneRaw) continue;
           const phone = sanitizePhone(phoneRaw);
-          if (digitCount(phone) < 5) continue;      // too short to be a real number
-          if (seenPhones.has(phone)) continue;       // dedupe within the sheet
+          if (digitCount(phone) < 5) continue;
+          if (seenPhones.has(phone)) continue;
           seenPhones.add(phone);
           masterContacts.push({ id: masterContacts.length, name: nameVal || 'Unknown', phone });
         }
@@ -567,8 +604,9 @@
     const nameInput = document.getElementById('manual-name').value.trim();
     const rawPhone = document.getElementById('manual-phone').value.trim();
     const phone = sanitizePhone(rawPhone);
-    if (digitCount(phone) < 7 || digitCount(phone) > 15){
-      alert('Enter a valid phone number (7–15 digits).');
+    
+    if (phone.length !== 10){
+      alert('Phone number must be exactly 10 digits.');
       return;
     }
     if (callQueue.some(c => c.phone === phone)){
@@ -713,8 +751,12 @@
   };
 
   window.promptBreakOrEnd = function(){
-    const choice = confirm('End the session and view your report?\n\nOK = View report\nCancel = Keep going');
-    if (choice) showReport();
+    const choice = prompt("Choose an option:\n1 = Take a Break (Pause session)\n2 = End List & View Report", "1");
+    if (choice === "1") {
+      alert("Session paused. Resume whenever ready!");
+    } else if (choice === "2") {
+      showReport();
+    }
   };
 
   // ---------- Report ----------
